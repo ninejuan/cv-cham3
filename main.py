@@ -4,8 +4,8 @@ from cvzone.FaceMeshModule import FaceMeshDetector
 import random
 import time
 
-correctionValue = 2.1
-directions = ['U', 'D', 'L', 'R']
+correctionValue = 2
+directions = ['Up', 'Down', 'Left', 'Right']
 max_rounds = 3
 correct_streak_needed = 3
 
@@ -71,35 +71,33 @@ while True:
                 # 방향 판단
                 detected_direction = 'Def'
                 if left_eye_distance > right_eye_distance * correctionValue:
-                    detected_direction = 'L'
+                    detected_direction = 'Left'
                 elif right_eye_distance > left_eye_distance * correctionValue:
-                    detected_direction = 'R'
+                    detected_direction = 'Right'
                 else:
                     detected_direction = 'Def'
-                
-                # 결과 표시
-                if detected_direction == current_direction:
-                    correct_streak = 0  # 연속 정답 횟수 리셋
-                    cv2.putText(img, 'Wrong!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
-                    cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-                    cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-                    cv2.imshow("Face Direction", img)
-                    cv2.waitKey(1000)  # 1초 동안 화면 정지
 
-                    game_state = 'lose'
-                else:
+                # 결과 표시
+                if detected_direction != current_direction:
                     correct_streak += 1
                     cv2.putText(img, 'Correct!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
-                    cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                    cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                else:
+                    correct_streak = 0
+                    cv2.putText(img, 'Wrong!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
 
-                    if correct_streak >= correct_streak_needed:
-                        game_state = 'win'
-                    round_count += 1
-                    if round_count >= max_rounds:
-                        game_state = 'reset'
-                    else:
-                        reset_game()
+                cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
+                
+                cv2.imshow("Face Direction", img)
+                cv2.waitKey(2000)  # 2초 동안 화면 정지
+
+                if correct_streak >= correct_streak_needed:
+                    game_state = 'win'
+                round_count += 1
+                if round_count >= max_rounds:
+                    game_state = 'reset'
+                else:
+                    reset_game()
             else:
                 game_state = 'reset'
 
@@ -107,16 +105,16 @@ while True:
         cv2.putText(img, 'You Win!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
         cv2.putText(img, 'Press R to replay', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(0)  # 카메라를 멈추기 위해 대기
+        cv2.waitKey(10000)  # 10초 동안 화면 정지
 
     elif game_state == 'lose':
         cv2.putText(img, 'You Lose!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
         cv2.putText(img, 'Press R to replay', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(0)  # 카메라를 멈추기 위해 대기
+        cv2.waitKey(1000)  # 1초 동안 화면 정지
 
         # 재시작 대기
-        key = cv2.waitKey(0)
+        key = cv2.waitKey(1000)
         if key == ord('q'):
             break
         elif key == ord('r'):
