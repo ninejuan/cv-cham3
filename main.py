@@ -3,6 +3,7 @@ import cvzone
 from cvzone.FaceMeshModule import FaceMeshDetector
 import random
 import time
+import numpy as np
 
 correctionValue = 2
 directions = ['Left', 'Right']
@@ -22,29 +23,48 @@ def reset_game():
     start_time = time.time()
     round_count = 0
     success_count = 0
-    game_state = 'playing'
+    game_state = 'main_screen'
     user_wins = 0
     correct_streak = 0
 
+def show_main_screen():
+    global img
+    img = np.zeros((480, 640, 3), dtype=np.uint8)  # 640x480 크기의 검은색 이미지를 생성합니다.
+    img[:] = (128, 128, 128)  # 회색 배경
+    cv2.putText(img, 'Cham Cham Cham', (img.shape[1] // 2 - 200, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
+    cv2.putText(img, "Press 'S' to start game.", (img.shape[1] // 2 - 250, img.shape[0] // 2 + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.imshow("Face Direction", img)
+
 reset_game()
+show_main_screen()
 
 while True:
     # 비디오 프레임 읽기
-    success, img = cap.read()
+    success, frame = cap.read()
     if not success:
         break
 
     # 좌우 반전
-    img = cv2.flip(img, 1)
+    img = cv2.flip(frame, 1)
 
-    # 얼굴 메시 감지
-    img, faces = detector.findFaceMesh(img, draw=True)
+    # 게임 상태에 따라 처리
+    if game_state == 'main_screen':
+        show_main_screen()
+        key = cv2.waitKey(1)
+        if key == ord('s'):
+            reset_game()
+            game_state = 'playing'
+        elif key == ord('q'):
+            break
 
-    # 현재 시간과 경과 시간 계산
-    current_time = time.time()
-    elapsed_time = current_time - start_time
+    elif game_state == 'playing':
+        # 얼굴 메시 감지
+        img, faces = detector.findFaceMesh(img, draw=True)
 
-    if game_state == 'playing':
+        # 현재 시간과 경과 시간 계산
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+
         # 카운트다운 표시
         remaining_time = max(0, int(5 - elapsed_time))
         cv2.putText(img, f'Time left: {remaining_time}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
@@ -101,25 +121,18 @@ while True:
             else:
                 game_state = 'reset'
 
-    if game_state == 'win':
+    elif game_state == 'win':
         cv2.putText(img, 'You Win!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
-        cv2.putText(img, 'Press R to replay', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(img, 'Returning to main screen...', (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.imshow("Face Direction", img)
         cv2.waitKey(10000)  # 10초 동안 화면 정지
+        game_state = 'main_screen'
 
-    elif game_state == 'lose':
-        cv2.putText(img, 'You Lose!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
-        cv2.putText(img, 'Press R to replay', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+    elif game_state == 'reset':
+        cv2.putText(img, 'Resetting...', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 255), 3, cv2.LINE_AA)
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(1000)  # 1초 동안 화면 정지
-
-        # 재시작 대기
-        key = cv2.waitKey(1000)
-        if key == ord('q'):
-            break
-        elif key == ord('r'):
-            reset_game()
-            game_state = 'playing'
+        cv2.waitKey(10000)  # 10초 동안 화면 정지
+        game_state = 'main_screen'
 
     # 결과 이미지 표시
     cv2.imshow("Face Direction", img)
