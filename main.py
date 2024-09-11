@@ -9,7 +9,7 @@ correctionValue = 1.5
 directions = ['Left', 'Right']
 max_rounds = 3
 correct_streak_needed = 3
-total_streak_needed = 3  # 3번 연속 승리 필요
+fail_on_not_moved = True  # 'Not Moved' 상태에서 패배 여부를 제어하는 변수
 
 # 얼굴 메시 감지기 초기화
 detector = FaceMeshDetector(maxFaces=1)
@@ -17,39 +17,42 @@ detector = FaceMeshDetector(maxFaces=1)
 # 웹캠에서 비디오 캡처
 cap = cv2.VideoCapture(0)
 
+# 텍스트를 화면 중앙에 배치하는 함수
+def put_text_center(img, text, y_offset=0, font_scale=1, color=(255, 255, 255), thickness=2):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    text_x = (img.shape[1] - text_size[0]) // 2
+    text_y = (img.shape[0] + text_size[1]) // 2 + y_offset
+    cv2.putText(img, text, (text_x, text_y), font, font_scale, color, thickness, cv2.LINE_AA)
+
 # 게임 상태
 def reset_game():
-    global current_direction, start_time, round_count, game_state, user_wins, correct_streak, fail_streak
+    global current_direction, start_time, round_count, game_state, correct_streak
     current_direction = random.choice(directions)
     start_time = time.time()
     round_count = 0
     game_state = 'main_screen'
-    user_wins = 0
     correct_streak = 0
-    fail_streak = 0  # 새 변수 추가
 
 def show_main_screen():
     global img
-    img = np.zeros((480, 640, 3), dtype=np.uint8)  # 640x480 크기의 검은색 이미지를 생성합니다.
-    img[:] = (128, 128, 128)  # 회색 배경
-    cv2.putText(img, 'Cham Cham Cham', (img.shape[1] // 2 - 200, img.shape[0] // 2 - 100), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3, cv2.LINE_AA)
-    cv2.putText(img, "Press 'S' to start game.", (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(img, "Press 'Q' to quit game.", (img.shape[1] // 2 - 200, img.shape[0] // 2 + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    img = np.zeros((480, 640, 3), dtype=np.uint8)
+    img[:] = (128, 128, 128)
+    put_text_center(img, 'Cham Cham Cham', y_offset=-100, font_scale=1.4, color=(0, 255, 0), thickness=3)
+    put_text_center(img, "Press 'S' to start game.", y_offset=0)
+    put_text_center(img, "Press 'Q' to quit game.", y_offset=60)
     cv2.imshow("Face Direction", img)
 
 reset_game()
 show_main_screen()
 
 while True:
-    # 비디오 프레임 읽기
     success, frame = cap.read()
     if not success:
         break
 
-    # 좌우 반전
     img = cv2.flip(frame, 1)
 
-    # 게임 상태에 따라 처리
     if game_state == 'main_screen':
         show_main_screen()
         key = cv2.waitKey(1)
@@ -60,101 +63,86 @@ while True:
             break
 
     elif game_state == 'playing':
-        # 얼굴 메시 감지
         img, faces = detector.findFaceMesh(img, draw=True)
 
-        # 현재 시간과 경과 시간 계산
         current_time = time.time()
         elapsed_time = current_time - start_time
 
-        # 카운트다운 표시
         remaining_time = max(0, int(5 - elapsed_time))
-        cv2.putText(img, f'Time left: {remaining_time}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        put_text_center(img, f'Time left: {remaining_time}', y_offset=-210, color=(0, 255, 0))
+        put_text_center(img, f'Round: {round_count + 1}/{max_rounds}', y_offset=-170, color=(0, 255, 0))
 
         if elapsed_time >= 5:
-            # 방향 지시와 카운트다운 시간 초과 후
             if faces:
-                # 첫 번째 얼굴에 대한 정보 얻기
                 face = faces[0]
-
-                # 코와 눈의 좌표 얻기
                 nose_tip = face[4]
                 left_eye = face[33]
                 right_eye = face[263]
 
-                # 코와 눈 사이의 거리 계산
                 left_eye_distance = np.sqrt((left_eye[0] - nose_tip[0]) ** 2 + (left_eye[1] - nose_tip[1]) ** 2)
                 right_eye_distance = np.sqrt((right_eye[0] - nose_tip[0]) ** 2 + (right_eye[1] - nose_tip[1]) ** 2)
 
-                # 방향 판단
                 detected_direction = 'Not Moved'
                 if right_eye_distance > left_eye_distance * correctionValue:
                     detected_direction = 'Left'
                 elif left_eye_distance > right_eye_distance * correctionValue:
                     detected_direction = 'Right'
-                else:
-                    detected_direction = 'Not Moved'
 
-                # 결과 표시
-                if detected_direction != current_direction:
+                if detected_direction == 'Not Moved' and fail_on_not_moved:
+                    game_state = 'fail'
+                    put_text_center(img, 'Not Moved! You Lose!', y_offset=-30, font_scale=1.5, color=(0, 0, 255), thickness=3)
+                elif detected_direction != current_direction:
                     correct_streak += 1
-                    cv2.putText(img, 'Correct!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
+                    put_text_center(img, 'Correct!', y_offset=-30, font_scale=2, color=(0, 255, 0), thickness=3)
                 else:
-                    correct_streak = 0
-                    fail_streak += 1  # 실패 횟수 증가
-                    cv2.putText(img, 'Wrong!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
+                    game_state = 'fail'
+                    put_text_center(img, 'Wrong!', y_offset=-30, font_scale=2, color=(0, 0, 255), thickness=3)
 
-                cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
-                cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
+                put_text_center(img, f'Computer: {current_direction}', y_offset=30, color=(0, 255, 0) if detected_direction == current_direction else (0, 0, 255))
+                put_text_center(img, f'You: {detected_direction}', y_offset=60, color=(0, 255, 0) if detected_direction == current_direction else (0, 0, 255))
                 
                 cv2.imshow("Face Direction", img)
-                cv2.waitKey(2000)  # 2초 동안 화면 정지
+                cv2.waitKey(2000)
 
-                if correct_streak >= correct_streak_needed:
-                    user_wins += 1
-                    correct_streak = 0  # 연속 승리 조건 리셋
-                    if user_wins >= total_streak_needed:
-                        game_state = 'win'
+                if game_state != 'fail':
+                    round_count += 1
+                    if round_count >= max_rounds:
+                        if correct_streak >= correct_streak_needed:
+                            game_state = 'win'
+                        else:
+                            game_state = 'fail'
                     else:
-                       reset_game()
-                round_count += 1
-                if round_count >= max_rounds:
-                    if fail_streak > 0:  # 실패 횟수 체크
-                        game_state = 'fail'
-                    else:
-                        reset_game()
+                        current_direction = random.choice(directions)
+                        start_time = time.time()
+
             else:
                 game_state = 'reset'
 
     elif game_state == 'win':
-        cv2.putText(img, 'You Win!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
-        cv2.putText(img, 'Returning to main screen...', (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        put_text_center(img, 'You Win!', y_offset=-60, font_scale=2, color=(0, 255, 0), thickness=3)
+        put_text_center(img, 'Returning to main screen...')
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(10000)  # 10초 동안 화면 정지
+        cv2.waitKey(10000)
         game_state = 'main_screen'
 
     elif game_state == 'fail':
-        cv2.putText(img, 'Fail!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
-        cv2.putText(img, 'Returning to main screen...', (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        put_text_center(img, 'Game Over!', y_offset=-60, font_scale=2, color=(0, 0, 255), thickness=3)
+        put_text_center(img, 'Returning to main screen...')
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(5000)  # 5초 동안 화면 정지
+        cv2.waitKey(5000)
         game_state = 'main_screen'
 
     elif game_state == 'reset':
-        user_wins = 0
-        cv2.putText(img, 'Resetting...', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 255), 3, cv2.LINE_AA)
+        put_text_center(img, 'Resetting...', y_offset=-30, font_scale=2, color=(0, 255, 255), thickness=3)
         cv2.imshow("Face Direction", img)
-        cv2.waitKey(10000)  # 10초 동안 화면 정지
-        game_state = 'main_screen'
+        cv2.waitKey(2000)
+        reset_game()
 
-    # 결과 이미지 표시
     cv2.imshow("Face Direction", img)
 
-    # 종료 또는 메인 페이지로 돌아가기
     key = cv2.waitKey(1)
     if key == ord('q'):
         break
 
-# 웹캠 및 창 자원 해제
 cap.release()
 cv2.destroyAllWindows()
