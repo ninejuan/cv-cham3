@@ -5,7 +5,7 @@ import random
 import time
 import numpy as np
 
-correctionValue = 2
+correctionValue = 1.5
 directions = ['Left', 'Right']
 max_rounds = 3
 correct_streak_needed = 3
@@ -31,8 +31,9 @@ def show_main_screen():
     global img
     img = np.zeros((480, 640, 3), dtype=np.uint8)  # 640x480 크기의 검은색 이미지를 생성합니다.
     img[:] = (128, 128, 128)  # 회색 배경
-    cv2.putText(img, 'Cham Cham Cham', (img.shape[1] // 2 - 200, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3, cv2.LINE_AA)
-    cv2.putText(img, "Press 'S' to start game.", (img.shape[1] // 2 - 250, img.shape[0] // 2 + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(img, 'Cham Cham Cham', (img.shape[1] // 2 - 200, img.shape[0] // 2 - 100), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3, cv2.LINE_AA)
+    cv2.putText(img, "Press 'S' to start game.", (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(img, "Press 'Q' to quit game.", (img.shape[1] // 2 - 200, img.shape[0] // 2 + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.imshow("Face Direction", img)
 
 reset_game()
@@ -80,39 +81,39 @@ while True:
                 left_eye = face[33]
                 right_eye = face[263]
 
-                # 눈과 코의 위치로부터 얼굴의 방향 추정
-                nose_to_left_eye = (left_eye[0] - nose_tip[0], left_eye[1] - nose_tip[1])
-                nose_to_right_eye = (right_eye[0] - nose_tip[0], right_eye[1] - nose_tip[1])
-
-                # 벡터의 길이 계산
-                left_eye_distance = (nose_to_left_eye[0]**2 + nose_to_left_eye[1]**2)**0.5
-                right_eye_distance = (nose_to_right_eye[0]**2 + nose_to_right_eye[1]**2)**0.5
+                # 코와 눈 사이의 거리 계산
+                left_eye_distance = np.sqrt((left_eye[0] - nose_tip[0]) ** 2 + (left_eye[1] - nose_tip[1]) ** 2)
+                right_eye_distance = np.sqrt((right_eye[0] - nose_tip[0]) ** 2 + (right_eye[1] - nose_tip[1]) ** 2)
 
                 # 방향 판단
                 detected_direction = 'Not Moved'
-                if left_eye_distance > right_eye_distance * correctionValue:
+                if right_eye_distance > left_eye_distance * correctionValue:
                     detected_direction = 'Left'
-                elif right_eye_distance > left_eye_distance * correctionValue:
+                elif left_eye_distance > right_eye_distance * correctionValue:
                     detected_direction = 'Right'
                 else:
                     detected_direction = 'Not Moved'
 
                 # 결과 표시
-                if detected_direction != current_direction and detected_direction != "Not Moved":
+                if detected_direction != current_direction:
                     correct_streak += 1
                     cv2.putText(img, 'Correct!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
                 else:
                     correct_streak = 0
                     cv2.putText(img, 'Wrong!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
 
-                cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction and detected_direction != "Not Moved" else (0, 0, 255), 2, cv2.LINE_AA)
-                cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction and detected_direction != "Not Moved" else (0, 0, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'You: {detected_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
                 
                 cv2.imshow("Face Direction", img)
                 cv2.waitKey(2000)  # 2초 동안 화면 정지
 
                 if correct_streak >= correct_streak_needed:
-                    game_state = 'win'
+                    user_wins += 1
+                    if user_wins >= 3:
+                        game_state = 'win'
+                    else:
+                        reset_game()
                 round_count += 1
                 if round_count >= max_rounds:
                     game_state = 'reset'
@@ -137,8 +138,9 @@ while True:
     # 결과 이미지 표시
     cv2.imshow("Face Direction", img)
 
-    # 'q' 키를 눌러 종료
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    # 종료 또는 메인 페이지로 돌아가기
+    key = cv2.waitKey(1)
+    if key == ord('q'):
         break
 
 # 웹캠 및 창 자원 해제
