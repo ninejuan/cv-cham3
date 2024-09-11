@@ -9,7 +9,7 @@ correctionValue = 1.5
 directions = ['Left', 'Right']
 max_rounds = 3
 correct_streak_needed = 3
-fail_on_not_moved = True  # 'Not Moved' 상태에서 패배 여부를 제어하는 변수
+fail_on_not_moved = False  # 'Not Moved' 상태에서 패배 여부를 제어하는 변수
 
 # 얼굴 메시 감지기 초기화
 detector = FaceMeshDetector(maxFaces=1)
@@ -42,6 +42,19 @@ def show_main_screen():
     put_text_center(img, "Press 'S' to start game.", y_offset=0)
     put_text_center(img, "Press 'Q' to quit game.", y_offset=60)
     cv2.imshow("Face Direction", img)
+
+def rgb2bgr(r, g, b):
+    return (b, g, r)
+
+def calcResultTextcolor(detected_direction, current_direction, isNotMovedAllowed):
+    if detected_direction == current_direction:
+        return rgb2bgr(255, 0, 0)
+    else:
+        if not isNotMovedAllowed:
+            return rgb2bgr(0, 255, 0)
+        else:
+            return rgb2bgr(255, 0, 0)
+            
 
 reset_game()
 show_main_screen()
@@ -98,11 +111,11 @@ while True:
                     game_state = 'fail'
                     put_text_center(img, 'Wrong!', y_offset=-30, font_scale=2, color=(0, 0, 255), thickness=3)
 
-                put_text_center(img, f'Computer: {current_direction}', y_offset=30, color=(0, 255, 0) if detected_direction == current_direction else (0, 0, 255))
-                put_text_center(img, f'You: {detected_direction}', y_offset=60, color=(0, 255, 0) if detected_direction == current_direction else (0, 0, 255))
+                put_text_center(img, f'Computer: {current_direction}', y_offset=30, color=calcResultTextcolor(detected_direction, current_direction, fail_on_not_moved))
+                put_text_center(img, f'You: {detected_direction}', y_offset=60, color=calcResultTextcolor(detected_direction, current_direction, fail_on_not_moved))
                 
                 cv2.imshow("Face Direction", img)
-                cv2.waitKey(2000)
+                cv2.waitKey(3000)
 
                 if game_state != 'fail':
                     round_count += 1
