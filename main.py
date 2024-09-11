@@ -9,6 +9,7 @@ correctionValue = 1.5
 directions = ['Left', 'Right']
 max_rounds = 3
 correct_streak_needed = 3
+total_streak_needed = 3  # 3번 연속 승리 필요
 
 # 얼굴 메시 감지기 초기화
 detector = FaceMeshDetector(maxFaces=1)
@@ -18,14 +19,14 @@ cap = cv2.VideoCapture(0)
 
 # 게임 상태
 def reset_game():
-    global current_direction, start_time, round_count, success_count, game_state, user_wins, correct_streak
+    global current_direction, start_time, round_count, game_state, user_wins, correct_streak, fail_streak
     current_direction = random.choice(directions)
     start_time = time.time()
     round_count = 0
-    success_count = 0
     game_state = 'main_screen'
     user_wins = 0
     correct_streak = 0
+    fail_streak = 0  # 새 변수 추가
 
 def show_main_screen():
     global img
@@ -100,6 +101,7 @@ while True:
                     cv2.putText(img, 'Correct!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3, cv2.LINE_AA)
                 else:
                     correct_streak = 0
+                    fail_streak += 1  # 실패 횟수 증가
                     cv2.putText(img, 'Wrong!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
 
                 cv2.putText(img, f'Computer: {current_direction}', (img.shape[1] // 2 - 150, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected_direction != current_direction else (0, 0, 255), 2, cv2.LINE_AA)
@@ -110,15 +112,17 @@ while True:
 
                 if correct_streak >= correct_streak_needed:
                     user_wins += 1
-                    if user_wins >= 3:
+                    correct_streak = 0  # 연속 승리 조건 리셋
+                    if user_wins >= total_streak_needed:
                         game_state = 'win'
                     else:
-                        reset_game()
+                       reset_game()
                 round_count += 1
                 if round_count >= max_rounds:
-                    game_state = 'reset'
-                else:
-                    reset_game()
+                    if fail_streak > 0:  # 실패 횟수 체크
+                        game_state = 'fail'
+                    else:
+                        reset_game()
             else:
                 game_state = 'reset'
 
@@ -129,7 +133,15 @@ while True:
         cv2.waitKey(10000)  # 10초 동안 화면 정지
         game_state = 'main_screen'
 
+    elif game_state == 'fail':
+        cv2.putText(img, 'Fail!', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3, cv2.LINE_AA)
+        cv2.putText(img, 'Returning to main screen...', (img.shape[1] // 2 - 200, img.shape[0] // 2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        cv2.imshow("Face Direction", img)
+        cv2.waitKey(5000)  # 5초 동안 화면 정지
+        game_state = 'main_screen'
+
     elif game_state == 'reset':
+        user_wins = 0
         cv2.putText(img, 'Resetting...', (img.shape[1] // 2 - 100, img.shape[0] // 2 - 60), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 255), 3, cv2.LINE_AA)
         cv2.imshow("Face Direction", img)
         cv2.waitKey(10000)  # 10초 동안 화면 정지
